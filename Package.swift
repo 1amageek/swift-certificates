@@ -14,23 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 import PackageDescription
-import Foundation
-
-let manifestDirectoryURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let manifestPath = manifestDirectoryURL.standardizedFileURL.path
-let isDependencyCheckout = manifestPath.contains("/.build/checkouts/")
-    || manifestPath.contains("/SourcePackages/checkouts/")
-
-func localOrForkDependency(_ repository: String, localPath: String) -> Package.Dependency {
-    let resolvedLocalPath = URL(fileURLWithPath: localPath, relativeTo: manifestDirectoryURL)
-        .standardizedFileURL
-        .path
-    if !isDependencyCheckout && FileManager.default.fileExists(atPath: resolvedLocalPath) {
-        return .package(path: resolvedLocalPath)
-    }
-
-    return .package(url: "https://github.com/1amageek/\(repository).git", branch: "main")
-}
 
 let package = Package(
     name: "swift-certificates",
@@ -86,10 +69,9 @@ let package = Package(
     ]
 )
 
-// Prefer sibling checkouts during fork development, and fall back to published 1amageek forks.
 package.dependencies += [
-    localOrForkDependency("swift-crypto", localPath: "../swift-crypto"),
-    localOrForkDependency("swift-asn1", localPath: "../swift-asn1"),
+    .package(url: "https://github.com/1amageek/swift-crypto.git", branch: "main"),
+    .package(url: "https://github.com/1amageek/swift-asn1.git", branch: "main"),
 ]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //
