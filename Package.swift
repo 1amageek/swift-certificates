@@ -14,7 +14,20 @@
 //===----------------------------------------------------------------------===//
 
 import PackageDescription
-import class Foundation.ProcessInfo
+import Foundation
+
+let manifestDirectoryURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+func localOrForkDependency(_ repository: String, localPath: String) -> Package.Dependency {
+    let resolvedLocalPath = URL(fileURLWithPath: localPath, relativeTo: manifestDirectoryURL)
+        .standardizedFileURL
+        .path
+    if FileManager.default.fileExists(atPath: resolvedLocalPath) {
+        return .package(path: resolvedLocalPath)
+    }
+
+    return .package(url: "https://github.com/1amageek/\(repository).git", branch: "main")
+}
 
 let package = Package(
     name: "swift-certificates",
@@ -70,12 +83,10 @@ let package = Package(
     ]
 )
 
-// If the `SWIFTCI_USE_LOCAL_DEPS` environment variable is set,
-// we're building in the Swift.org CI system alongside other projects in the Swift toolchain and
-// we can depend on local versions of our dependencies instead of fetching them remotely.
+// Prefer sibling checkouts during fork development, and fall back to published 1amageek forks.
 package.dependencies += [
-    .package(path: "../swift-crypto"),
-    .package(path: "../swift-asn1"),
+    localOrForkDependency("swift-crypto", localPath: "../swift-crypto"),
+    localOrForkDependency("swift-asn1", localPath: "../swift-asn1"),
 ]
 
 // ---    STANDARD CROSS-REPO SETTINGS DO NOT EDIT   --- //
