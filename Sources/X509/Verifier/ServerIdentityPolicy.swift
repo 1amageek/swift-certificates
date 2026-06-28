@@ -89,8 +89,13 @@ extension ServerIdentityPolicy: VerifierPolicy {
 extension ServerIdentityPolicy {
     @usableFromInline
     enum IPAddress: Sendable {
+        #if canImport(WASILibc)
+        case v4([UInt8])
+        case v6([UInt8])
+        #else
         case v4(in_addr)
         case v6(in6_addr)
+        #endif
     }
 
     @usableFromInline
@@ -154,6 +159,12 @@ extension ServerIdentityPolicy {
     }
 
     // This should really be an init, but weird compiler issues have prevented it from being one.
+    #if canImport(WASILibc)
+    @_spi(Testing)
+    public static func parsingIPv4Address(_ string: String) -> [UInt8]? {
+        X509IPAddressParser.parseIPv4Address(string)
+    }
+    #else
     @_spi(Testing)
     public static func parsingIPv4Address(_ string: String) -> in_addr? {
         var value = in_addr()
@@ -165,8 +176,15 @@ extension ServerIdentityPolicy {
         if rc != 1 { return nil }
         return value
     }
+    #endif
 
     // This should really be an init, but weird compiler issues have prevented it from being one.
+    #if canImport(WASILibc)
+    @_spi(Testing)
+    public static func parsingIPv6Address(_ string: String) -> [UInt8]? {
+        X509IPAddressParser.parseIPv6Address(string)
+    }
+    #else
     @_spi(Testing)
     public static func parsingIPv6Address(_ string: String) -> in6_addr? {
         var value = in6_addr()
@@ -178,6 +196,7 @@ extension ServerIdentityPolicy {
         if rc != 1 { return nil }
         return value
     }
+    #endif
 }
 
 extension Optional where Wrapped == ServerIdentityPolicy.LazyIPAddress {
@@ -236,6 +255,16 @@ extension Optional where Wrapped == ServerIdentityPolicy.LazyServerHostname {
 
 extension ServerIdentityPolicy.IPAddress {
     init?(sanField: ASN1OctetString) {
+        #if canImport(WASILibc)
+        switch sanField.bytes.count {
+        case 4:
+            self = .v4(Array(sanField.bytes))
+        case 16:
+            self = .v6(Array(sanField.bytes))
+        default:
+            return nil
+        }
+        #else
         switch sanField.bytes.count {
         case 4:
             let addr = sanField.bytes.withUnsafeBufferPointer {
@@ -250,6 +279,7 @@ extension ServerIdentityPolicy.IPAddress {
         default:
             return nil
         }
+        #endif
     }
 }
 
@@ -351,10 +381,17 @@ extension Certificate {
     ) -> Bool {
         // These match if the two underlying IP address structures match.
         switch (serverIP, certificateIP) {
+        #if canImport(WASILibc)
+        case (.v4(let addr1), .v4(let addr2)):
+            return addr1.elementsEqual(addr2)
+        case (.v6(let addr1), .v6(let addr2)):
+            return addr1.elementsEqual(addr2)
+        #else
         case (.v4(var addr1), .v4(var addr2)):
             return memcmp(&addr1, &addr2, MemoryLayout<in_addr>.size) == 0
         case (.v6(var addr1), .v6(var addr2)):
             return memcmp(&addr1, &addr2, MemoryLayout<in6_addr>.size) == 0
+        #endif
         default:
             // Different protocol families, no match.
             return false

@@ -14,9 +14,11 @@
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
-import Dispatch
 #else
 import Foundation
+#endif
+#if canImport(Dispatch)
+import Dispatch
 #endif
 import SwiftASN1
 
@@ -46,13 +48,20 @@ extension CertificateStore {
         return CertificateStore(systemTrustStore: true)
     }()
 
-    static let cachedSystemTrustRootsFuture: Future<[DistinguishedName: [Certificate]], any Error> =
-        DispatchQueue(
+    static let cachedSystemTrustRootsFuture: Future<[DistinguishedName: [Certificate]], any Error> = {
+        #if canImport(Dispatch)
+        return DispatchQueue(
             label: "com.apple.swift-certificates.trust-roots",
             qos: .userInteractive
         ).asyncFuture {
             try Self.loadTrustRoots(at: rootCAFileSearchPaths)
         }
+        #else
+        let promise = Promise<[DistinguishedName: [Certificate]], any Error>()
+        promise.fulfil(with: Result { try Self.loadTrustRoots(at: rootCAFileSearchPaths) })
+        return Future(promise)
+        #endif
+    }()
 }
 
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
@@ -94,6 +103,7 @@ extension CertificateStore {
     }
 }
 
+#if canImport(Dispatch)
 @available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, macCatalyst 13, visionOS 1.0, *)
 extension DispatchQueue {
     func asyncFuture<Success: Sendable>(
@@ -106,3 +116,4 @@ extension DispatchQueue {
         return Future(promise)
     }
 }
+#endif

@@ -82,6 +82,8 @@ extension String {
         return self.withCString(encodedAs: UTF16.self) {
             return InetPtonW(AF_INET, $0, &v4) == 1 || InetPtonW(AF_INET6, $0, &v6) == 1
         }
+        #elseif canImport(WASILibc)
+        return X509IPAddressParser.parseIPv4Address(self) != nil || X509IPAddressParser.parseIPv6Address(self) != nil
         #else
         // We need some scratch space to let inet_pton write into.
         var ipv4Addr = in_addr()
